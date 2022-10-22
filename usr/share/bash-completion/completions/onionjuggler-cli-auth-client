@@ -1,0 +1,38 @@
+# onionjuggler-cli-auth-client(8) completion               -*- shell-script -*-
+
+_onionjuggler_cli_auth_client()
+{
+    local cur prev words cword
+    _init_completion -s || return
+
+    case $prev in
+        --client | --replace-file | \
+            --client-priv-config | --client-priv-key )
+            return
+        ;;
+        --client-priv-file )
+            _filedir auth_private
+            return
+        ;;
+        --signal )
+            COMPREPLY=($(compgen -W "reload restart none" -- "$cur"))
+            return
+        ;;
+        --on | --off | --list | --getopt )
+            return
+        ;;
+        --help | --version | --getconf )
+            return
+        ;;
+    esac
+
+    if [[ $cur == -* ]]; then
+        COMPREPLY=($(compgen -W "$(_parse_help "$1")" -- "$cur"))
+        [[ ${COMPREPLY-} == *= ]] && compopt -o nospace
+        return
+    fi
+
+} &&
+    complete -F _onionjuggler_cli_auth_client onionjuggler-cli-auth-client
+
+# ex: filetype=sh

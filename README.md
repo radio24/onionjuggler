@@ -22,13 +22,12 @@ Quick link to this repository: [git.io/onionjuggler](https://git.io/onionjuggler
   * [Goal](#goal)
   * [Features](#features)
 * [Requirements](#requirements)
+* [Compatibility](#compatibility)
 * [Instructions](#instructions)
   * [Clone the repository](#clone-the-repository)
   * [Set custom variables](#set-custom-variables)
   * [Setup the environment](#setup-the-environment)
   * [Usage](#usage)
-    * [tui](#tui)
-    * [cli](#cli)
 * [Featured on](#featured-on)
 * [Contributors](#contributors)
 
@@ -72,11 +71,7 @@ Editing the tor configuration file (torrc) is not difficult, but automation solv
   * **Server** - Generate key pair or add public part, list client names and their public keys from `<HiddenServiceDir>/authorized_clients/<client>.auth`. If any client is configured, the service will not be acessible without authentication.
   * **Client** - Generate key pair or add public part, list your `<ClientOnionAuthDir>/<SOME_ONION>.auth_private`.
 * [**Onion-Location**](https://community.torproject.org/onion-services/advanced/onion-location/) - For public onion services You can redirect your plainnet users to your onion service with this guide for nginx, apache2 and html header attributes.
-* **Backup** - Better be safe.
-  * **Create** -  Backup of your `torrc` lines containing hidden service configuration, all of your directories of `HiddenServiceDir` and `ClientOnionAuthDir`.
-  * **Integrate** - Integrate hidden serivces lines configuration from `torrc` and the directories `HiddenServiceDir` and `ClientOnionAuthDir` to your current system. This option should be used after creating a backup and importing to the current host.
 * [**OpSec**](https://community.torproject.org/onion-services/advanced/opsec/) - Operation Security
-  * [**Vanguards**](https://github.com/mikeperry-tor/vanguards) - This addon protects against guard discovery and related traffic analysis attacks. A guard discovery attack enables an adversary to determine the guard node(s) that are in use by a Tor client and/or Tor onion service. Once the guard node is known, traffic analysis attacks that can deanonymize an onion service (or onion service user) become easier.
   * [**Unix socket**](https://riseup.net/en/security/network-security/tor/onionservices-best-practices) - Support for enabling an onion service over unix socket to avoid localhost bypasses.
 * **Web server** - Serve files with your hidden service using Nginx or Apache2 web server.
 * **Usability** - There are two dialog boxes compatible with the project, `dialog` and `whiptail`.
@@ -94,12 +89,9 @@ Editing the tor configuration file (torrc) is not difficult, but automation solv
   * **tor** >= 0.3.5.7
   * **grep** >=0.9
   * **sed**
-  * **tar** (Backup)
   * **openssl** >= 1.1 (Client Authorization - requires algorithm x25519, so it can't be LibreSSL)
   * **basez** >= 1.6.2 (Client Authorization)
-  * **git** (Vanguards)
-  * **python3** (Vanguards)
-  * **python(3)-stem** >=1.8.0 (Vanguards)
+  * **git** (Build)
   * **dialog**/**whiptail** (TUI)
   * **nginx**/**apache2** (Web server)
 
@@ -110,7 +102,15 @@ Editing the tor configuration file (torrc) is not difficult, but automation solv
   * **pandoc** (Manual)
   * **shellcheck** (Review)
 
-If using Vanguards, `python2.6` is the minimal required for [Stem](https://stem.torproject.org/faq.html#what-python-versions-is-stem-compatible-with), but it is not going to be installed by default.
+## Compatibility
+
+Mainly tested on Debian systems, including Whonix.
+
+It can work on OpenBSD -
+- auth -> if you build `basez` from source, as it is not in ports.
+- web -> nginx or apache, openbsd's httpd configuration was difficult to cleanly remove the server block
+
+Regarding other operating systems, please see [etc/onionjuggler](etc/onionjuggler) for pre-defined configuration for your operating system. They were not all tested
 
 ## Instructions
 
@@ -121,27 +121,6 @@ git clone https://github.com/nyxnor/onionjuggler.git
 cd onionjuggler
 ```
 
-### Set custom variables
-
-You should not modify the default configuration on `/etc/onionjuggler/onionjuggler.conf`, it will be modified on every update. Your local configurations should be on `/etc/onionjuggler/conf.d/*.conf`.
-
-To assign values to the variables, yyou can either:
-
-* Open the mentioned configuration file with your favorite editor:
-```sh
-"${EDITOR:-vi}" /etc/onionjuggler/cond.d/local.conf
-```
-
-* or insert configuration to the end of the file with tee:
-```sh
-printf "tor_conf_dir=\"/etc/tor\"\n" | tee -a /etc/onionjuggler/cond.d/local.conf
-```
-
-* or edit with sed:
-```sh
-sed -i'' "s|^tor_conf_dir=.*|tor_conf_dir=\"/etc/tor\"|" /etc/onionjuggler/cond.d/local.conf
-```
-
 ### Setup the enviroment
 
 Run from inside the cloned repository to create the tor directories, create manual pages and copy scripts to path:
@@ -149,60 +128,37 @@ Run from inside the cloned repository to create the tor directories, create manu
 ./configure.sh --install
 ```
 
+### Set custom variables
+
+You should not modify the default configuration on `/etc/onionjuggler/onionjuggler.conf`, it will be modified on every update. Your local configurations should be on `/etc/onionjuggler/conf.d/*.conf`, and from this folder, they will be parsed using lexical order, and the last value will supersede the defaults.
+
+
 ### Usage
 
-### configure.sh
+Each configuration and script has its own manual page and help message, it is the best way to learning onionjuggler entirely.
 
-**configure.sh** setup the environment for OnionJuggler by adding the scripts and manual pages to path and detecting your operating system to fit with its default configuration. It can also be used to uninstall. Common development use is to create manual pages, check shell syntax and do all of the aforementioned and give the git status for files to be commited. The update option is raw and only recommended for development as of now.
-
-Install:
+Before executing any script to make changes, it is recommended to see what options are configured. Every script has a `--getconf` option that will print the current configuration read by onionjuggler:
 ```sh
-configure.sh -i
+onionjuggler-cli --getconf
 ```
 
-Uninstall:
+It is also possible to get command line options without making changes, useful to see if the assignment is correct:
 ```sh
-configure.sh -d
+onionjuggler-cli --getopt --service=example --hs-version=3
 ```
 
-Update (development only):
-```sh
-configure.sh -u
-```
-
-#### tui
-
-**onionjuggler-tui** wraps the CLI in a Terminal User Interface.
-Some TUI options will let you edit the authorization files, which is recommended to set your favorite text editor to an environment variable that will be tried on the following order: `DOAS_EDITOR`/`SUDO_EDITOR`, if empty will try `VISUAL`, if empty will try `EDITOR`, if empty WILL fallback to `Vi`.
-
-Read the [tui manual](docs/onionjuggler-tui.1.md)
-```sh
-man onionjuggler-tui
-```
-
-To use the TUI, just run:
+**To use the TUI, just run:**
 ```sh
 onionjuggler-tui
 ```
 
-#### cli
-
-**onionjuggler-cli** is the main script that manages the HiddenServices. Take a look at the documentation inside `docs` folder, there are many other onion services management guides. Read:
-
-Don't forget the [cli manual](docs/onionjuggler-cli.1.md) and the [conf manual](docs/onionjuggler.conf.5.md) for advanced usage:
+**To create a service on the CLI:**
 ```sh
-man onionjuggler-cli
-man onionjuggler.conf
+onionjuggler-cli --on --service=terminator --socket=tcp --hs-version=3 --port="80:127.0.0.1:80"
 ```
 
-To create a service named `terminator`, it is as easy as possible:
-```sh
-onionjuggler-cli activate -s terminator -p 80
-```
-But can be as advanced as specifying all the parameters:
-```sh
-onionjuggler-cli activate --service terminator --socket unix --version 3 --port 80,127.0.0.1:80
-```
+Many more things are possible, read the man pages
+
 
 ## Featured on
 

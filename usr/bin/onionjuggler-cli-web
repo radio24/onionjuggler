@@ -3,9 +3,9 @@
 ## Webserver management
 
 onionjuggler_defaults="/usr/share/onionjuggler/defaults.sh"
-[ -e "${onionjuggler_defaults}" ] || { printf '%s\n' "${onionjuggler_defaults} does not exist"; exit 1; }
-[ -f "${onionjuggler_defaults}" ] || { printf '%s\n' "${onionjuggler_defaults} is not a regular file"; exit 1; }
-[ -r "${onionjuggler_defaults}" ] || { printf '%s\n' "${onionjuggler_defaults} can not be read"; exit 1; }
+[ -e "${onionjuggler_defaults}" ] || { printf '%s\n' "library ${onionjuggler_defaults} does not exist"; exit 1; }
+[ -f "${onionjuggler_defaults}" ] || { printf '%s\n' "library ${onionjuggler_defaults} is not a regular file"; exit 1; }
+[ -r "${onionjuggler_defaults}" ] || { printf '%s\n' "library ${onionjuggler_defaults} can not be read"; exit 1; }
 . "${onionjuggler_defaults}"
 source_conf
 
@@ -15,12 +15,29 @@ check_plugin_enabled "${me}" || error_msg "Plugin '${me}' is disabled by configu
 usage(){
   printf %s"Usage: ${me} [--option <ARGUMENT>]
 Complete options:
-  --on [--service <SERVICE>] [--folder <SITE_PATH>]
-                                start serving a website for certain service and its folder
-  --on [--service <SERVICE>] [--folder <SITE_PATH>] [--port <VIRTPORT,TARGET>] [--no-check-service]
-                                useful for workstations when the tor process is running on the gateway
-  --off [--service <SERVICE>]   stop serving a website for certain service and its folder
-  --list                        list enabled websites
+  --on [--service=<SERVICE>] [--folder=<SITE_PATH>]
+                            start serving a website for certain service and its folder
+  --on [--service=<SERVICE>] [--folder=<SITE_PATH>] [--no-check-service] [--port=<VIRTPORT[:TARGET]>]
+                            useful for workstations when the tor process is running on the gateway
+  --off [--service=<SERVICE>]
+                            stop serving a website for certain service and its folder
+  --list                    list enabled websites
+
+Options:
+  --on                      activate website
+    --service=<SERVICE>     service that will host the website
+    --folder=<SITE_PATH>    path to directory holding the html
+    --no-check-service      for workstations, don't check service existence
+    --port=<VIRTPORT[:TARGET]>
+                            for workstation, indicate port listening port
+  --off                     stop website
+    --service=<SERVICE>     stop website for service
+  --list                    list enabled websites
+    --service=<SERVICE>     list from services
+  --version                 print version
+  --getopt                  print options parsed
+  --getconf                 print configuration values
+  -h, --help                print this help message
 "
   exit 1
 }
@@ -39,12 +56,13 @@ while :; do
   arg_possible="${2}" ## need to pass the second positional parameter because maybe it is an argument
   clean_opt "${1}" || break
   case "${opt}" in
-    on|off|list|n|f|l) status="${opt}";;
-    s|service|s=*|service=*) get_arg service;;
-    o|onion|o=*|onion=*) get_arg onion;;
-    p|port|p=*|port=*) get_arg port;;
-    w|folder|w=*|folder=*) get_arg folder;;
-    no-check-service) no_check_service=1;;
+    on|off|list|n|f|l) set_arg status "${opt}";;
+    s|service) get_arg service;;
+    o|onion) get_arg onion;;
+    p|port) get_arg port;;
+    w|folder) get_arg folder;;
+    no-check-service) set_arg no_check_service 1;;
+    getopt|getconf|V|version) set_arg dev "${opt}";;
     h|help) usage;;
     *) error_msg "Invalid option: '${opt_orig}'";;
   esac
@@ -57,34 +75,63 @@ done
 ########################
 ######### MAIN #########
 
+case "${dev}" in
+  getconf) get_conf_values; exit 0;;
+  getopt) printf %s"${arg_saved}\n"; exit 0;;
+  V|version) printf '%s\n' "${me} ${version}"; exit 0;;
+esac
+
+pre_run_check
 [ -z "${status}" ] && usage
-if [ "${webserver}" != "nginx" ] && [ "${webserver}" != "apache2" ] && [ "${webserver}" != "openbsd-httpd" ]; then
+if [ "${webserver}" != "nginx" ] && [ "${webserver}" != "apache2" ]; then
   error_msg "webserver can be either 'nginx' or 'apache2', not '${webserver}'"
 fi
 
 reload_webserver(){
   notice "\nReloading web server to apply new configuration"
   case "${webserver}" in
-    nginx) nginx -t && nginx -s reload;;
-    apache2) apache2 -t && apache2 -k graceful;;
-    openbsd-httpd)
-      openbsd_httpd_test="$(httpd -n -f "${webserver_conf}" 2>&1)"
-      if [ "${openbsd_httpd_test}" = "no actions, nothing to do" ] || [ "${openbsd_httpd_test}" = "configuration OK" ]; then
-        rcctl reload httpd
+    nginx)
+      if nginx -t; then
+        nginx -s reload
+      else
+        rm -f "${webserver_conf_dir}/sites-available/${service}-onion.conf"
+        rm -f "${webserver_conf_dir}/sites-enabled/${service}-onion.conf"
+        error_msg "Webserver configuration failed, aborting"
+      fi
+    ;;
+    apache2)
+      if apache2 -t; then
+        apache2 -k graceful
+      else
+        rm -f "${webserver_conf_dir}/sites-available/${service}-onion.conf"
+        rm -f "${webserver_conf_dir}/sites-enabled/${service}-onion.conf"
+        error_msg "Webserver configuration failed, aborting"
       fi
     ;;
   esac
-  [ "${?}" -eq 1 ] && error_msg "Failed to reload ${webserver}, you must restart it manually before running this script again."
+  if [ "${?}" -eq 1 ]; then
+    error_msg "Failed to reload ${webserver}, you must restart it manually before running this script again."
+  fi
 }
 
-## user option
-[ "$(id -u)" -ne 0 ] && error_msg "run as root"
+
 case "${status}" in
 
   n|on)
     { [ -z "${service}" ] || [ -z "${folder}" ]; } && usage
 
+    ## Don't check if service exists. Useful for Workstations
     if [ "${no_check_service}" = "1" ]; then
+      check_opt_filled port
+      port="$(printf %s"${port}" | tr "," " " | tr -s " " | tr " " "\n" | sed "s|:| |")"
+      virtport="${port% *}"
+      target="${port#* }"
+      target_addr="${target%%:*}"
+      target_port="${target##*:}"
+      ## happens when user specified only the port without addr
+      [ "${target_addr}" = "${target_port}" ] && target="127.0.0.1:${target_port}"
+      is_addr_port "${target}"
+    else
       is_service_dir_empty
       test_service_exists "${service}"
       port=$(service_block print "${service}" "${tor_conf}" | grep "HiddenServicePort" | tail -n 1)
@@ -93,25 +140,16 @@ case "${status}" in
       target=${only_ports##* }
       target_addr="${target%%:*}"
       target_port="${target##*:}"
-    else
-      [ -z "${port}" ] && error_msg "Missing onion service target port that the webserver will listen to"
-      port="$(printf '%s\n' "${port}" | tr "," " ")"
-      virtport="${port% *}"
-      target="${port#* }"
-      target_addr="${target%%:*}"
-      target_port="${target##*:}"
-      ## happens when user specified only the port without addr
-      [ "${target_addr}" = "${target_port}" ] && target="127.0.0.1:${target_port}"
-      is_addr_port "${target}"
     fi
 
     case "${webserver}" in
-      apache2|openbsd-httpd) printf %s"${target}" | grep -q "unix" && error_msg "Web server '${webserver}' does not accept listening on a unix domain socket." ;;
+      apache2) printf %s"${target}" | grep -q "unix" && error_msg "Web server '${webserver}' does not accept listening on a unix domain socket." ;;
     esac
-    notice "${cyan}Activating web server for the onion service: ${service}${nocolor}\n"
+    notice "${cyan}Activating web server for the service: ${service}${nocolor}\n"
     case "${webserver}" in
       nginx|apache2)
-        [ ! -d "${webserver_conf}" ] && error_msg "webserver_conf=${webserver_conf} directory does not exist"
+        test -d "${webserver_conf_dir}/sites-available" || error_msg "${webserver_conf_dir}/sites-available directory does not exist"
+        test -d "${webserver_conf_dir}/sites-enabled" || error_msg "${webserver_conf_dir}/sites-enabled directory does not exist"
         ## If $folder starts with '~/' or '/', user specified the path, if started with anything else expect a folder inside ${website_dir}
         case "${folder}" in
           ~/*|/*) :;;
@@ -119,32 +157,23 @@ case "${status}" in
         esac
         [ ! -d "${folder}" ] && error_msg "Website folder '${folder}' does not exist."
       ;;
-      openbsd-httpd)
-        ## TODO: website_dir is not being used here, the chroot dir is /var/www and the root expected is /htdocs
-        case "${folder}" in
-          "htdocs"*) folder="/${folder}";;
-          "/htdocs"*|/*) :;;
-          *) folder="/htdocs/${folder}";;
-        esac
-        [ ! -d "${folder}" ] && error_msg "Folder '${folder}' does not exist."
-      ;;
     esac
 
     case "${webserver}" in
       nginx)
         printf %s"
 server {
-    listen ${target};
-    server_name ${onion_hostname:-"_"};
+    listen ${target} default_server;
 
     server_tokens off;
     access_log /var/log/nginx/access_${service}.log;
     error_log /var/log/nginx/error_${service}.log;
 
     root ${folder};
-    index index.html index.htm index.php;
+    index index.html index.htm index.nginx-debian.html index.php;
 }
-" | tee "${webserver_conf}/${service}-onion.conf"
+" | tee "${webserver_conf_dir}/sites-available/${service}-onion.conf"
+        ln -sf "${webserver_conf_dir}/sites-available/${service}-onion.conf" "${webserver_conf_dir}/sites-enabled/${service}-onion.conf"
       ;;
       apache2)
         printf %s"
@@ -155,15 +184,8 @@ server {
     ServerTokens Prod
     ServerSignature Off
 </VirtualHost>
-" | tee "${webserver_conf}/${service}-onion.conf"
-      ;;
-      openbsd-httpd)
-        printf %s"
-server \"${onion_hostname}\" {
-    listen on ${target_addr} port ${target_port}
-    root \"${folder}\"
-}
-" | tee -a "${webserver_conf}"
+" | tee "${webserver_conf_dir}/sites-available/${service}-onion.conf"
+        ln -sf "${webserver_conf_dir}/sites-available/${service}-onion.conf" "${webserver_conf_dir}/sites-enabled/${service}-onion.conf"
       ;;
     esac
     reload_webserver
@@ -172,16 +194,39 @@ server \"${onion_hostname}\" {
       notice "\n# Address: ${magenta}${onion_hostname}:${virtport}${nocolor}"
       has qrencode && qrencode -m 2 -t ANSIUTF8 "${onion_hostname}:${virtport}"
     fi
+
+    if [ "${operating_system}" = "anon-workstation" ]; then
+      printf '\n'
+      ## create whonix firewall folder, allow port via config file, reload firewall
+      notice "Allow port ${target_port} on firewall /usr/local/etc/whonix_firewall.d/40_onionjuggler.conf"
+      mkdir -p /usr/local/etc/whonix_firewall.d/
+      echo "EXTERNAL_OPEN_PORTS+=\" ${target_port} \"" | sudo tee -a /usr/local/etc/whonix_firewall.d/40_onionjuggler.conf
+      whonix_firewall
+      ## information to activate the service
+      printf '\n'
+      notice "${magenta}Activate the onion service on the Gateway with the following options:${nocolor}"
+      has qubesdb-read && target_addr_remote="$(qubesdb-read /qubes-ip)"
+      printf '%s\n' "  -s ${service} -p ${virtport} ${target_addr_remote:-${target_addr}}:${target_port}"
+    fi
   ;;
 
   f|off)
     [ -z "${service}" ] && usage
+    if [ "${operating_system}" = "anon-workstation" ]; then
+      ## block WS firewall based on webserver listening port
+      target="$(grep "listen " "${webserver_conf_dir}/sites-enabled/${service}-onion.conf" | sed "s/.*listen //;s/\;//")"
+      target_addr="${target%%:*}"
+      target_port="${target##*:}"
+      printf '\n'
+      notice "Closing port ${target_port} on firewall /usr/local/etc/whonix_firewall.d/40_onionjuggler.conf"
+      sed -i'' "/EXTERNAL_OPEN_PORTS+=\" ${target_port} \"/d" /usr/local/etc/whonix_firewall.d/40_onionjuggler.conf
+      whonix_firewall
+    fi
     disable_site(){
       service="${1}"
       notice "\nStopping website of the service: ${service}"
       case "${webserver}" in
-        nginx|apache2) rm -fv "${webserver_conf}/${service}-onion.conf";;
-        openbsd-httpd) httpd_service_block delete "${service}" "${webserver_conf}";;
+        nginx|apache2) rm -fv "${webserver_conf_dir}/sites-available/${service}-onion.conf" "${webserver_conf_dir}/sites-enabled/${service}-onion.conf";;
       esac
     }
     loop_list disable_site "${service}" 0
@@ -193,13 +238,12 @@ server \"${onion_hostname}\" {
     notice "${bold}# Enabled websites:${nocolor}"
     case "${webserver}" in
       nginx|apache2)
-        for site in "${webserver_conf}"/*; do
+        for site in "${webserver_conf_dir}/sites-enabled"/*; do
           site="${site##*/}"
           site="${site%*-onion.conf}"
           sites_enabled="$(printf '%s\n%s\n' "${sites_enabled}" "${site}")"
         done
         ;;
-      openbsd-httpd) httpd_service_block print "${service}" "${webserver_conf}";;
     esac
     if [ -n "${sites_enabled}" ]; then
       notice "\n${sites_enabled}"

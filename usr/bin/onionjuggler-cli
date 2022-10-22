@@ -9,140 +9,69 @@
 me="${0##*/}"
 
 onionjuggler_defaults="/usr/share/onionjuggler/defaults.sh"
-[ -e "${onionjuggler_defaults}" ] || { printf '%s\n' "${onionjuggler_defaults} does not exist"; exit 1; }
-[ -f "${onionjuggler_defaults}" ] || { printf '%s\n' "${onionjuggler_defaults} is not a regular file"; exit 1; }
-[ -r "${onionjuggler_defaults}" ] || { printf '%s\n' "${onionjuggler_defaults} can not be read"; exit 1; }
+[ -e "${onionjuggler_defaults}" ] || { printf '%s\n' "library ${onionjuggler_defaults} does not exist"; exit 1; }
+[ -f "${onionjuggler_defaults}" ] || { printf '%s\n' "library ${onionjuggler_defaults} is not a regular file"; exit 1; }
+[ -r "${onionjuggler_defaults}" ] || { printf '%s\n' "library ${onionjuggler_defaults} can not be read"; exit 1; }
 . "${onionjuggler_defaults}"
 source_conf
 
 usage(){
-  printf %s"${magenta}
-                           ';:  -'''
-                      ':' -=l.:>l_
-                     '^';z;_|J/':'
-                    '|;l''?7xc:'
-                    r1ztJtv;':'
-                   'xxxtx|-'
-               ':' '|ttxv:
-               7Or:{tx|'
-                O?':,Jom,
-                vN'_'i9@;
-               'g9'_'j2Qg-
-             _xBt-':'>USMQv'
-          ;uQDc.'';_:'lOjoOBNu:
-       ~yQ6|.'''':;_:,';DSjjj6#QX;
-     ?BQv''''''-=>'_'l'''8yjjjujqQQi
-   :R#>'''''->|r-''_'.7'';gjjuujjjPQN:
-  7@7'''''rl>-''''.;:'-1.'OPjuuuujjjM@l
- i@:''''*i'''''''.;_*''.u'lQjuuuuuujjK@r
-~@1''''u,'''''',::'_-J,',1~@SjjuuuujjjQQ'
-}@'''.a.'''':>;.'''_''/,'e.@Ejjuuuuuujh@>
-Z@'''],'''.v^'''''';_''u'l:@Kjjuuuuuuja@v
-}@.''a'''-o''''''->^;;'*l>/@OjjuuuuuujX@|
-_@v'':i''L,'''''_{'_'y''kJu@6jjuuuujjjN@-
- v@:''7r'l;'''''x''_'o':Eqe@ojjuuuujjE@L
-  F@c''|=.R'''''u''_'o:lSjQQjjjuujjuO@}
-   ?Qq,'rcr8,'''e,'_'q-kZv@EjuujujoNQ|
-    'iQO^,xlm7-''E'_~g;DO@OjjjujhBQ1'
-       :jWkmycjl^:FxPXQ@@kjSEDQQe;
-          -;vmdgN@@Q@@@QROsev^-
-${nocolor}
-Usage: ${me} [--option <ARGUMENT>]
+
+  printf %s"Usage: ${me} [--option <ARGUMENT>]
 \nComplete options:
-  --activate [--service <SERVICE>] [--socket <unix>] [--version <3>] [--port <VIRTPORT [VIRTPORT2]>]
-                                                             enable a service listening with tcp sockets
-  --deactivate [--service <SERVICE>] [--socket <tcp>] [--version <3>] [--port <VIRTPORT[,TARGET] [,VIRTPORT2][,TARGET2]>]
-                                                             enable a service listening on unix sockets
-  --deactivate [--purge] [--service <@all|SERV1,SERV2,...>   disable a service and optionally purge its directory
-  --info [--quiet] [--service <@all|SERV1,SERV2,...>]        see credentials from indicated services
-  --renew [--service <@all|SERV1,SERV2,...>]                 renew indicated services addresses
-  --auth-server --on [--service <SERVICE>] [--client <CLIENT>] [--client-pub-key <CLIENT_PUB_KEY>]
-                                                             add client authorization, optionally add client's public key
-  --auth-server --on [--service <@all|SERV1,SERV2,...>] [--client <CLIENT1,CLIENT2,...>]
-                                                             add client authorization
-  --auth-server --off [--service <@all|SERV1,SERV2,...>] [--client <@all|CLIENT1,CLIENT2,...>]
-                                                             remove client authorization
-  --auth-server --list [--service <@all|SERV1,SERV2,...>]    list authorized clients for indicated service
-  --auth-client --on [--onion <ONION>] [--client-priv-key <CLIENT_PRIV_KEY>]
-                                                             add authorization of client access, optionally add client's private key
-  --auth-client --off [--onion <ONION>]                      remove authorization of client access
-  --auth-client --list                                       list your keys as a client
-  --web --on [--service <SERVICE>] [--folder <SITE_PATH>]    start serving a website for certain service and its folder
-  --web --on [--service <SERVICE>] [--folder <SITE_PATH>] [--port <TARGET>] [--no-check-service]
-                                                             useful for workstations when the tor process is running on the gateway
-  --web --off [--service <SERVICE>]                          stop serving a website for certain service and its folder
-  --web --list                                               list enabled websites
-  --location [--nginx|--apache2|--html] [--service <SERVICE>]  onion-location guide, no execution
-  --backup [--create|--integrate]                            backup onion services or integrate the backup
-  --vanguards [--on|--list|--off]                            install or upgrade, remove or see logs for vanguards addon
-  -h|--help                                                  display this help message
+  --on [--service=<SERVICE>] [--socket=<unix>] [--port=<VIRTPORT,[VIRTPORT2]>]
+                             enable a service listening with tcp sockets
+
+  --on [--service=<SERVICE>] [--port=<VIRTPORT[:TARGET][,VIRTPORT2][:TARGET2]>]
+                             enable a service listening on unix sockets
+
+  --off [--purge] [--service=<@all|SERV1,SERV2,...>
+                             disable a service and optionally purge its dir
+
+  --list [--quiet] [--service=<@all|SERV1,SERV2,...>]
+                             see credentials from indicated services
+
+  --renew [--service=<@all|SERV1,SERV2,...>]
+                             renew indicated services addresses
+
+  -h|--help                  display this help message
 
 Options:
-  --getconf                                                  print configuration
-  --getopt                                                   print options given by the command line
-  --on                                                       activate an onion service
-    -s, --service <SERVICE>                                  service to activate
-    -S, --socket <tcp|unix>                                  define a socket for the new onion service
-    -v, --version 3                                          define a version for the new onion service
-    -p, --port <VIRTPORT[,TARGET],VIRTPORT2[,TARGET2]>       define ports for the new onion service
-    -g, --gateway                                            define target 127.0.0.1 (Gateway local IP) (does not overwrite specified target)
-  --off                                                      deactivate an onion service configuration
-    -s, --service <SERV1,SERV2,...>                          service to deactivate
-    -P, --purge                                              purge the onion service data
-  --info                                                     list existing services and their configuration, clients
-    -s, --service <@all|SERV1,SERV2,...>                     list all services or a indicate them comma separated
-    -q, --quiet                                              don't QR encode the hostname
-  --auth-server                                              manage authorized_clients
-    -s, --service <@all|SERV1,SERV2,...>                     authorize or remove authorization to indicated services
-    -n, --on                                                 authorized aclient
-    -f, --off                                                remove authorization from a client
-    -l, --list                                               list authorized clients
-    -c, --client <CLIENT>                                    choose client
-    -K, --client-pub-key <CLIENT_PUB_KEY>                    specify client pub key to authorize to one service
-  --auth-client                                              manage your authorizations to an onion
-    -n, --on                                                 add authorization
-    -f, --off                                                remove authorization
-    -l, --list                                               list current authorizations
-    -o, --onion <ONION>                                      specify onion to authenticate
-    -k, --client-priv-key <CLIENT_PRIV_KEY>                  specify your client private key
-  --web                                                      manage web server configuration
-    -s, --service <SERVICE>                                  service to enable or disable website
-    -n, --on                                                 activate website to an onion service
-    -f, --off                                                deactivate website to an onion service
-    -l, --list                                               list active websites
-    -w, --folder <SITE_PATH>                                 specify website files
-    -p, --port <TARGET_PORT>                                 use specified port. Useful for Workstations
-    --no-check-service                                       don't check if service exists. Useful for Workstations
-  --backup                                                   complete backup of onion services
-    -M, --make                                               make a backup
-    -I, --integrate                                          integrate backup to your system
-  --vanguards                                                manage Vanguards protection
-    -n, --on                                                 install Vanguards addon, if already installed, upgrade
-    -f, --off                                                remove Vanguards
-    -l, --list                                               see Vanguards logs
+  -V, --version              print version
+  --getconf                  print configuration
+  --getopt                   print options given by the command line
+  --on                       activate an onion service
+    -s, --service=<SERVICE>  service to activate
+    -S, --socket=<tcp|unix>  define a socket, default tcp
+    -v, --hs-version=3       set service version, default 3
+    -p, --port=<VIRTPORT[:TARGET],VIRTPORT2[:TARGET2]>
+                             define ports for the new onion service
+    -g, --gateway            define target 127.0.0.1 (doesn't override target)
+  --off                      deactivate an onion service configuration
+    -s, --service=<SERV1,SERV2,...>
+                             service to deactivate
+    -P, --purge              purge the onion service data
+  --list                     list existing services data
+    -s, --service=<@all|SERV1,SERV2,...>
+                             list all services or indicate them comma separated
+    -q, --quiet              don't QR encode the hostname
 
 Advanced:
-  -G, --plugin <PLUGIN>                                      specify a plugin (onionjuggler-cli-*) to be parsed, example: web
-  -R, --restart                                              signal tor to restart if the option ever signal tor
-  -r, --reload                                               signal tor to reload (default option) if the option ever signal tor
+  --signal=<SIGNAL>          when signaling tor, send signal to reload (hup),
+                             restart (int) or no signal (none). Default: reload
 
 Option names:
-  main                                                       activate, deactivate, info, renew, auth-server, auth-client, web, vanguards
-  plugin                                                     auth-server, auth-client, web, vanguards
-  status                                                     --on, --off, --list
-  action                                                     --purge, --quiet, --nginx, --apache2, --html, --make, --integrate
-  signal                                                     --restart, --reload
+  status                     --on, --off, --list, --renew
+  action                     --purge, --quiet
+  signal                     reload (int), restart (hup), no (none)
 
 Positional arguments:
-  TARGET                                                     [addr:]port
-  @all                                                       all services or clients available
-  SERV1,SERV2...                                             specify services
-  CLIENT1,CLIENT2,...                                        specify clients
+  TARGET                     [addr:]port
+  @all                       all services or clients available
+  SERV1,SERV2...             specify services comma separated
 
-'# Done': You should always see it at the end, else something unexpected occured.
-It does not imply the code worked, you should always pay attention for errors in the logs.
 If your services are unreacheable, restart tor.
-\nReport bugs to: https://github.com/nyxnor/onionsjuggler/issues\n"
+Report bugs to: https://github.com/nyxnor/onionsjuggler/issues\n"
 
   exit 1
 }
@@ -151,6 +80,7 @@ If your services are unreacheable, restart tor.
 #### OPTION PARSING ####
 
 ## Save all options
+# shellcheck disable=SC2034
 args_full="${*}"
 
 ## hacky getopts
@@ -166,24 +96,15 @@ while :; do
   clean_opt "${1}" || break
   # shellcheck disable=SC2034
   case "${opt}" in
-    activate|deactivate|info|renew) main="${opt}";;
-    auth-server|auth-client|web|location|backup|vanguards) plugin="${opt}";;
-    G|plugin|G=*|plugin=*) get_arg plugin;;
-    getopt|getopts|getconf) dev="${opt}";;
-    on|off|list|n|f|l) status="${opt}";;
-    R|restart|r|reload) signal="${opt}";;
-    P|purge|nginx|apache2|html|q|quiet|M|make|I|integrate) action="${opt}";;
-    s|service|s=*|service=*) get_arg service;;
-    c|client|c=*|client=*) get_arg client;;
-    o|onion|o=*|onion=*) get_arg onion;;
-    v|version|v=*|version=*) get_arg version;;
-    S|socket|S=*|socket=*) get_arg socket;;
-    p|port|p=*|port=*) get_arg port;;
-    g|gateway) gateway_service=1;;
-    w|folder|w=*|folder=*) get_arg folder;;
-    k|client-priv-key|k=*|client-priv-key=*) get_arg client_priv_key;;
-    K|client-pub-key|K=*|client-pub-key=*) get_arg client_pub_key;;
-    no-check-service) no_check_service=1;;
+    getopt|getconf|V|version) set_arg dev "${opt}";;
+    signal) get_arg signal;;
+    on|off|list|n|f|l|renew) set_arg status "${opt}";;
+    P|purge|q|quiet) set_arg action "${opt}";;
+    s|service) get_arg service;;
+    v|hs_version) get_arg hs_version;;
+    S|socket) get_arg socket;;
+    p|port) get_arg port;;
+    g|gateway) set_arg gateway_service 1;;
     h|help) usage;;
     *) error_msg "Invalid option: '${opt_orig}'";;
   esac
@@ -197,93 +118,52 @@ done
 ########## MAIN ###########
 
 ## development options
+## no file is changed
+## useful to see if the command is correct before running it
 case "${dev}" in
-  ## execute or modify nothing, just print the configuration values
-  ## usefult to see if there is nothing messed up and if there is, can be checked before running the cli.
-  getconf)
-    for key in openssl_cmd webserver webserver_conf website_dir vanguards_commit \
-    tor_daemon tor_user tor_conf_dir tor_conf_user_group tor_conf tor_data_dir tor_data_dir_services tor_data_dir_auth \
-    tor_control_port tor_backup_dir tor_hiddenserviceport_target_addr; do
-      eval val='$'"${key}"
-      [ -n "${val:-}" ] && printf '%s\n' "${key}=\"${val}\""
-    done
-    exit 0
-  ;;
-
-  ## only print the options given on the command line, mostly for development purposes to check the argument
-  ## but can be useful to see if the command is correct before running it.
-  getopt|getopts)
-    for key in signal main plugin service client onion status action version socket port folder \
-    client_priv_key client_pub_key gateway_service; do
-      eval val='$'"${key}"
-      [ -n "${val}" ] && printf '%s\n' "${key}=\"${val}\""
-    done
-    exit 0
-  ;;
+  getconf) get_conf_values; exit 0;;
+  getopt) printf %s"${arg_saved}\n"; exit 0;;
+  V|version) printf '%s\n' "${me} ${version}"; exit 0;;
 esac
 
-
-## user option
-[ "$(id -u)" -ne 0 ] && error_msg "run as root"
-
-## need at least an empty configuration file to be analyzed
-if ! test -f "${tor_conf}"; then
-  touch "${tor_conf}"
-  chmod "${tor_conf}" 644
-  chown "${tor_conf_user_group}" "${tor_conf}"
-fi
-
-
-## plugins
-## requires script named "onionjuggler-cli-*"
-if [ -n "${plugin}" ]; then
-  plugin="${plugin##*onionjuggler-cli-}"
-  script_plugin="onionjuggler-cli-${plugin}"
-  if [ -n "${onionjuggler_plugin}" ]; then
-    printf '%s\n' "${onionjuggler_plugin}" | tr "," " " | tr -s " " | tr " " "\n" | grep -q -- "^${plugin}$" \
-    || error_msg "Plugin '${plugin}' is disabled by configuration"
-  fi
-  ## check if plugin is installed
-  has "${script_plugin}" || error_msg "${script_plugin} is not installed"
-  ## clean uncessary options to parse on plugin
-  args_plugin_clean="$(printf '%s\n' "${args_full}" | sed "s|--plugin [^ ]*||;s|-G [^ ]*||" | tr " " "\n" | sed "s|^--plugin=.*$||;s|^-G=.*$||;s|^--${plugin}$||" | tr "\n" " " | tr -s " ")"
-  # shellcheck disable=SC2086
-  "${script_plugin}" ${args_plugin_clean}
-  ## exit with the same exit code from the plugin script
-  exit "${?}"
-fi
-
 ## main options
-case "${main}" in
+pre_run_check
+case "${status}" in
 
   ## enable a service by configure its own torrc's block, consequentially the <HiddenServiceDir> will be created.
   ## tcp-socket uses addr:port, which can be remote or localhost. It leaks onion address to the local network
   ## unix-socket uses unix:path, which is create a unique name for it. It does not leak onion address to the local network.
   ## virtport is the port to be used by the client when visiting the service.
   ## empty socket will default to tcp
-  ## empty version will default to 3
+  ## empty hs_version will default to 3
   ## target is where the incoming traffic from virtport gets redirected. This option is abscent on unix-socket because the script completes it.
   ##  if target is not specified, will use the same port from virtport and bind to localhost.
   ##  if target only contains the port number and not the address, will bind to localhost.
   ## virtport2 and target 2 are optional
-  activate)
-    [ -z "${service}" ] && error_msg "service name can not be empty"
-    check_service_name
-    grep -q -E "^HiddenServiceDir ${tor_data_dir_services}/${service}$|^HiddenServiceDir ${tor_data_dir_services}/${service}/$" "${tor_conf}" && error_msg "service '${service}' already exists, choose another name"
-    : "${version:=3}"; [ "${version}" != "3" ] && error_msg "version ${version} is not available" ## wait for v4 to change this
+  n|on)
+    check_opt_filled service
+    check_name service
+    # shellcheck disable=SC2086
+    service_exists="$(grep -n -e "HiddenServiceDir ${tor_data_dir_services}/${service}$" -e "HiddenServiceDir ${tor_data_dir_services}/${service}/$" ${tor_config_files} | grep -v "[[:space:]]*\#")"
+    if test -n "${service_exists}"; then
+      service_exists_file="$(printf '%s\n' "${service_exists}" | cut -d ":" -f1)"
+      service_exists_line="$(printf '%s\n' "${service_exists}" | cut -d ":" -f2)"
+      error_msg "service '${tor_data_dir_services}/${service}' already exists on file '${service_exists_file}' at line '${service_exists_line}'. Choose another name"
+    fi
+    : "${hs_version:=3}"; [ "${hs_version}" != "3" ] && error_msg "hs-version ${hs_version} is not available" ## wait for v4 to change this
     : "${socket:=tcp}"
-    [ -z "${port}" ] && error_msg "port can not be empty"
+    check_opt_filled port
 
     ## backup torrc
     safe_edit tmp tor_conf
     notice "Including Hidden Service configuration to ${tor_conf_tmp}"
-    printf %s"\nHiddenServiceDir ${tor_data_dir_services}/${service}\nHiddenServiceVersion ${version}\n" | tee -a "${tor_conf_tmp}"
+    printf %s"\nHiddenServiceDir ${tor_data_dir_services}/${service}\nHiddenServiceVersion ${hs_version}\n" | tee -a "${tor_conf_tmp}"
 
     finish_service_activation(){
       ## remove double empty lines
       cat_squeeze_blank "${tor_conf_tmp}" | tee "${tor_conf_tmp}".tmp >/dev/null && mv "${tor_conf_tmp}".tmp "${tor_conf_tmp}"
       signal_tor
-      virtport="$(service_block print "${service}" "${tor_conf}" | grep "HiddenServicePort" | sed "s/HiddenServicePort //;s/ .*//" | tr "\n" "," | sed "s/\,$//")"
+      virtport="$(service_block print "${service}" "${tor_conf}" | grep "HiddenServicePort" | sed "s/HiddenServicePort //;s/ .*//" | tr "\n" "," | sed "s/\,$//;s/\,/\, /")"
       ## show the Hidden Service address
       test_service_exists "${service}"
       notice "Hidden Service information:"
@@ -298,27 +178,23 @@ case "${main}" in
       tcp)
         ## tor-manual: By default, this option maps the virtual port to the same port on target_ip_default over TCP
         ## Because of that, this project lets the user leave target="" and write target as $target_ip_default:$virtport
-        ## Also, substitutes localhost:port for $target_ip_default:$port to make exact math for target always, as localhost and target_ip_default mean the same thing
+        ## Also, substitutes localhost:port for $target_ip_default:$port to make exact match for target always, as localhost and target_ip_default mean the same thing
         ## This measures avoid using the same local port for different services
         ## Sanity check
-        if test -f /usr/share/anon-gw-base-files/gateway; then ## Whonix Gateway
-          if [ "${gateway_service}" = "1" ]; then ## Service should use Gateway ip (127.0.0.1)
-            target_ip_default="127.0.0.1"
-          elif has qubesdb-read; then ## Qubes-Whonix
-            target_ip_default="${tor_hiddenserviceport_target_addr}"
-          else
-            target_ip_default="10.152.152.11" ## Non-Qubes-Whonix
-          fi
-        elif test -f /usr/share/anon-ws-base-files/workstation; then ## Whonix Workstation
+        if [ "${operating_system}" = "anon-gateway" ]; then ## Gateway
+          [ "${gateway_service}" = "1" ] && target_ip_default="127.0.0.1"
+        elif [ "${operating_system}" = "anon-workstation" ]; then ## Workstation
           error_msg "Create onion services on the Gateway, not on the Workstation"
-        else
-          target_ip_default="${tor_hiddenserviceport_target_addr:-127.0.0.1}" ## Common target
         fi
+        : "${target_ip_default:="127.0.0.1"}" ## Common target
 
         ## get ports
-        port="$(printf %s"${port}" | tr " " "\n" | tr "," " " | tr -s " ")"
+        ## translate commas to spaces, truncate spaces, translate spaces to new lines,
+        ##  and substitute the first semicolon to space.
+        ## 80:127.0.0.1:80,443:127.0.0.1:443 becomes: 80 127.0.0.1:80\n443 127.0.0.1:443
+        port="$(printf %s"${port}" | tr "," " " | tr -s " " | tr " " "\n" | sed "s|:| |")"
 
-        fail_log="$(mktemp)"
+        fail_log="${onionjuggler_tmp_dir}/on-fail"
         printf '%s\n' "${port}" | while IFS="$(printf '\n')" read -r port_line; do
           IFS=" " read -r virtport target <<-EOF
             $(printf '%s\n' "${port_line}")
@@ -336,26 +212,47 @@ EOF
           is_integer "${virtport}"
           is_addr_port "${target}"
 
-          ## Qubes-Whonix should have a different target for services aiming to the Workstation
-          if has qubesdb-read && [ "${target_addr}" = "127.0.0.1" ] && [ "${gateway_service}" != "1" ]; then
-            echo "1" | tee -a "${fail_log}" >/dev/null
-            error_msg "Please set the Workstation Qube IP address using the option 'tor_hiddenserviceport_target_addr' on /etc/onionjuggler/conf.d/*.conf"
-          fi
-
-          ## check if the tager is already used in the torrc
-          ## the first part check if the target is present on the tor configuration file
-          ## the second part checks if the target port is used on a hs port without a target, meaning using the same port from virtual port
-          if grep -q "^HiddenServicePort .* ${target}$" "${tor_conf}" || grep -q "^HiddenServicePort ${target_port}$" "${tor_conf}"; then
+          ## check if the target is being used by another already configured service
+          if grep -q \
+            -e "^HiddenServicePort ${target_port}$" \
+            -e "^HiddenServicePort .* ${target_port}$" \
+            -e "^HiddenServicePort .* ${target_addr}$" \
+            -e "^HiddenServicePort .* ${target}$" \
+            "${tor_dump_config_hs}"
+          then
+            ## get which line number the pattern is repeated
+            repeated_port_line_number="$(grep -n \
+            -e "^HiddenServicePort ${target_port}$" \
+            -e "^HiddenServicePort .* ${target_port}$" \
+            -e "^HiddenServicePort .* ${target_addr}$" \
+            -e "^HiddenServicePort .* ${target}$" \
+            "${tor_dump_config_hs}" | cut -d ":" -f1)"
+            repeated_port_service="$(head -"${repeated_port_line_number}" "${tor_dump_config_hs}" | grep HiddenServiceDir | tail -1 | cut -d " " -f2)"
             printf %s"HiddenServicePort ${virtport} ${target}\n"
             echo "1" | tee -a "${fail_log}" >/dev/null
-            error_msg "Target '${target}' is already in use.\nINFO: Choose another port or disable the service that is using the wanted port."
+            error_msg "Target '${target}' is already in use by the service '${repeated_port_service}'. Choose another target combination of addr:port or disable the service that is using the same target."
           fi
-          ## this check is the same as from above, but instead, it check the temporary configuration file that is being modified now
-          if grep -q "^HiddenServicePort .* ${target}$" "${tor_conf_tmp}" || grep -q "^HiddenServicePort ${target_port}$" "${tor_conf_tmp}"; then
+
+          ## check if the target is being used multiple times by the new configuration
+          if grep -q \
+            -e "^HiddenServicePort ${target_port}$" \
+            -e "^HiddenServicePort .* ${target_port}$" \
+            -e "^HiddenServicePort .* ${target_addr}$" \
+            -e "^HiddenServicePort .* ${target}$" \
+            "${tor_conf_tmp}"
+          then
             printf %s"HiddenServicePort ${virtport} ${target}\n"
             echo "1" | tee -a "${fail_log}" >/dev/null
             error_msg "Target '${target}' was specified multiple times, but it can only happen once."
           fi
+
+          ## anon-gateway should have a different target for services aiming to the Workstation
+          if [ "${operating_system}" = "anon-gateway" ] && [ "${target_addr}" = "127.0.0.1" ] && [ "${gateway_service}" != "1" ]; then
+            printf %s"HiddenServicePort ${virtport} ${target}\n"
+            echo "1" | tee -a "${fail_log}" >/dev/null
+            error_msg "Target was set to 127.0.0.1 but option '--gateway' was not specified, otherwise set the Workstation IP address"
+          fi
+
           printf %s"HiddenServicePort ${virtport} ${target}\n" | tee -a "${tor_conf_tmp}"
         done
         printf '\n' | tee -a "${tor_conf_tmp}"
@@ -366,11 +263,11 @@ EOF
       ;;
 
       unix)
-        port="$(printf %s"${port}" | tr "," " " | tr " " "\n" | tr -s " ")"
+        port="$(printf %s"${port}" | tr "," " " | tr -s " " | tr " " "\n")"
         ## /var/run/ because it exists on Debian and OpenBSD, so respecting standards
         unix_path="unix:/var/run/${service}"
 
-        fail_log="$(mktemp)"
+        fail_log="${onionjuggler_tmp_dir}/on-fail"
         printf '%s\n' "${port}" | while IFS="$(printf '\n')" read -r port_line; do
           IFS=" " read -r virtport <<-EOF
             $(printf '%s\n' "${port_line}")
@@ -380,10 +277,10 @@ EOF
           target="${unix_path}-${virtport}-onion.sock"
           is_integer "${virtport}"
           ## check wheter target is already in use on the tor configuration file
-          if grep -q "^HiddenServicePort .* ${target}$" "${tor_conf}"; then
+          if grep -q "^HiddenServicePort .* ${target}$" "${tor_dump_config_hs}"; then
             printf %s"HiddenServicePort ${virtport} ${target}\n"
             echo "1" | tee -a "${fail_log}" >/dev/null
-            error_msg "Target '${target}' is already in use.\nINFO: Choose another port or disable the service that is using the wanted port."
+            error_msg "Target '${target}' is already in use. Choose another port or disable the service that is using the wanted port."
           fi
           ## check wheter target is already in use on the temporary copy of the tor configuration file
           if grep -q "^HiddenServicePort .* ${target}$" "${tor_conf_tmp}"; then
@@ -411,18 +308,27 @@ EOF
   ## purge is optional, it deletes the <HiddenServiceDir>
   ## will not check if folder or configuration exist, this is cleanup mode
   ## will not use '@all'. Purge is dangerous, purging all service is even more dangerous. Always backup.
-  deactivate)
-    [ -z "${service}" ] && usage
+  f|off)
     delete_service(){
       service="${1}"
       printf "\n"
       ## remove service service data
       case "${action:-}" in
         purge|P)
-          notice "${red}Deleting HiddenServiceDir ${underline}${tor_data_dir_services}/${service}${nocolor}"
-          rm -rfv "${tor_data_dir_services:?}"/"${service:?}"
+          if test -d "${tor_data_dir_services}/${service}"; then
+            notice "${red}Deleting HiddenServiceDir ${underline}${tor_data_dir_services}/${service}${nocolor}"
+            rm -rfv "${tor_data_dir_services:?}/${service:?}"
+          else
+            notice "${tor_data_dir_services}/${service} doesn't exist"
+          fi
         ;;
-        *) notice "${yellow}Keeping HiddenServiceDir ${underline}${tor_data_dir_services}/${service}${nocolor}";;
+        *)
+          if test -d "${tor_data_dir_services}/${service}"; then
+            notice "${yellow}Keeping HiddenServiceDir ${underline}${tor_data_dir_services}/${service}${nocolor}"
+          else
+            notice "${tor_data_dir_services}/${service} doesn't exist"
+          fi
+        ;;
       esac
       ## remove service paragraph in torrc
       notice "Deleting HiddenService configuration in ${underline}${tor_conf_tmp}${nounderline}"
@@ -431,42 +337,106 @@ EOF
       cat_squeeze_blank "${tor_conf_tmp}" | tee "${tor_conf_tmp}".tmp >/dev/null && mv "${tor_conf_tmp}".tmp "${tor_conf_tmp}"
       notice "Disabled service: ${bold}${service}${magenta}${nocolor}"
     }
+
+    check_opt_filled service
     safe_edit tmp tor_conf
     loop_list delete_service "${service}"
     printf "\n"
     signal_tor
-    notice "${green}done!${nocolor}"
   ;;
 
 
   ## show all the necessary information to access the service such as the hostname and the QR encoded hostname to scan for Tor Browser Mobile
   ## show the clients names and quantity, as well as the service torrc's block
   ## @all will read through all services folders and execute the commands
-  info)
-    is_service_dir_empty
-    [ -z "${service}" ] && usage
+  l|list)
+
     get_service_info(){
       service="${1}"
-      test_service_exists "${service}"
+      service_clean="${service%*/}" ## remove trailing slash from the end
+      service_base="${service_clean##*/}" ## get basename
+      service_dir="${service_clean%/*}" ## get dirname
+
+      if [ "${service_dir}" = "${service}" ]; then
+        service_dir="${tor_data_dir_services}"
+      fi
+
+      ## happens when there is a hidden service configured but
+      ## the configuration was not parsed because tor was not reloaded
+      ## so no hostname is found
+      test_service_exists "${service_clean}" || return
+
       j=$((j+1))
-      [ ${j} -eq 1 ] && printf "<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>\n"
+      [ ${j} -eq 1 ] && printf '\n'
       ## save clients names that are inside <HiddenServiceDir>/authorized_clients/
-      create_client_list "${service}"
+      create_client_list "${service_clean}"
       if [ "${action}" != "q" ] && [ "${action}" != "quiet" ]; then
         has qrencode && qrencode -m 2 -t ANSIUTF8 "${onion_hostname}"
       fi
-      notice "Address = ${bold}${magenta}${onion_hostname}${nocolor}"
-      notice "Service = ${bold}${service}${nocolor}"
-      [ -n "${client_name_list}" ] && notice "Clients = ${bold}${client_name_list} (${client_count})${nocolor}"
-      if grep -q -E "^HiddenServiceDir ${tor_data_dir_services}/${service}$|^HiddenServiceDir ${tor_data_dir_services}/${service}/$" "${tor_conf}"; then
-        notice "Status  = ${bold}${green}active${nocolor}" && service_block print "${service}" "${tor_conf}"
+
+      # shellcheck disable=SC2086
+      service_configuration_found="$(grep -H -e "HiddenServiceDir ${service_dir}/${service_base}$" -e "HiddenServiceDir ${service_dir}/${service_base}/$" ${tor_config_files} | grep -v -F "#" | cut -d ":" -f1)"
+      notice "${bold}Host:${nocolor} ${magenta}${onion_hostname}${nocolor}"
+      notice "${bold}Directory:${nocolor} ${service}"
+      test -n "${service_configuration_found}" && notice "${bold}Conf:${nocolor} ${service_configuration_found}"
+
+      [ -n "${client_name_list}" ] && notice "${bold}Clients:${nocolor} ${client_name_list} (${client_count})"
+
+      if [ "${service_configuration_found}" = "${tor_conf}" ] && [ "${service_dir}" = "${tor_data_dir_services}" ]; then
+        notice "${bold}Managed:${nocolor} ${green}True${nocolor}"
+      elif [ -z "${service_configuration_found}" ] && [ "${service_dir}" = "${tor_data_dir_services}" ]; then
+        notice "${bold}Managed:${nocolor} ${yellow}Could be - Inactive service${nocolor}"
+      elif [ -z "${service_configuration_found}" ] && [ "${service_dir}" != "${tor_data_dir_services}" ]; then
+        notice "${bold}Managed:${nocolor} ${yellow}False - Inactive service - Data is not at ${tor_data_dir_services}${nocolor}"
+      elif [ "${service_configuration_found}" != "${tor_conf}" ] && [ "${service_dir}" = "${tor_data_dir_services}" ]; then
+        notice "${bold}Managed:${nocolor} ${yellow}False - Not created by ${tor_conf}${nocolor}"
+      elif [ "${service_configuration_found}" = "${tor_conf}" ] && [ "${service_dir}" != "${tor_data_dir_services}" ]; then
+        notice "${bold}Managed:${nocolor} ${yellow}False - Data is not at ${tor_data_dir_services}${nocolor}"
       else
-        notice "Status  = ${bold}${yellow}inactive${nocolor}"
+        notice "${bold}Managed:${nocolor} ${yellow}False - Not created by ${tor_conf} - Data is not at ${tor_data_dir_services}${nocolor}"
       fi
-      printf "<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>\n"
+
+      if [ -z "${service_configuration_found}" ]; then
+        notice "${bold}Status:${nocolor} ${yellow}Inactive - No configuration found${nocolor}"
+      else
+        notice "${bold}Status:${nocolor} ${green}Active${nocolor}" && service_block print "${service_clean}" "${tor_dump_config_hs}"
+      fi
+
+      printf '\n'
     }
+
+    #is_service_dir_empty
+
+    if [ -z "${service}" ] || [ "${service}" = "@all" ]; then
+
+      ## get all services found by configuration
+      ## tor --dump-config also shows services that have never been created (tor not reloaded)
+      for hs in $(grep "HiddenServiceDir" "${tor_dump_config_hs}" | sed "s/HiddenServiceDir //" | tr -s "\n" " "); do
+        service_dir="${hs##* }"
+        if test -z "${service_dir}"; then
+          service_name_list="$(printf %s"${service_dir}\n")"
+        else
+          service_name_list="$(printf %s"${service_name_list}\n${service_dir}\n")"
+        fi
+      done
+
+      ## get services that may or may not be inactive that are in ${tor_data_dir}
+      ## and add it to the service_name_list
+      service_dir_pattern="hs_ed25519_secret_key"
+      service_found_by_key="$(find "${tor_data_dir}" -type f -name "${service_dir_pattern}")"
+      for hs in ${service_found_by_key}; do
+        service_dir="${hs%/*}"
+        echo "${service_name_list}" | grep -q -e "^${service_dir}$" -e "^${service_dir}/$" || \
+          service_name_list="$(printf %s"${service_name_list}\n${service_dir}\n")"
+      done
+
+      ## print error message about no services found
+      test -z "${service_name_list}" && error_msg "No services were found active by configuration or inactive in ${tor_data_dir}"
+
+      service="${service_name_list}"
+    fi
+
     j=0
-    [ "${service}" = "@all" ] && { create_service_list; service="${service_name_list}"; }
     loop_list get_service_info "${service}"
   ;;
 
@@ -475,8 +445,8 @@ EOF
   ## <HiddenServiceDir>/authorized_clients/ because the would need to update their '.auth_private' file with the new onion address anyway and for security reasons.
   ## @all will read through all services folders and execute the commands.
   renew)
-    [ -z "${service}" ] && usage
-    [ "${service}" != "@all" ] && check_service_name
+    check_opt_filled service
+    [ "${service}" != "@all" ] && check_name service
     is_service_dir_empty
 
     renew_delete_old(){
@@ -484,9 +454,9 @@ EOF
       test_service_exists "${service}"
       eval "${service}"_hostname_old="${onion_hostname}"
       notice "\n${cyan}Renewing hostname of the service: ${bold}${service}${nocolor}"
-      rm -fv "${tor_data_dir_services}"/"${service}"/hs_ed25519_secret_key
-      rm -fv "${tor_data_dir_services}"/"${service}"/hs_ed25519_public_key
-      rm -fv "${tor_data_dir_services}"/"${service}"/hostname
+      rm -fv "${tor_data_dir_services}/${service}"/hs_ed25519_secret_key
+      rm -fv "${tor_data_dir_services}/${service}"/hs_ed25519_public_key
+      rm -fv "${tor_data_dir_services}/${service}"/hostname
     }
     renew_get_new(){
       service="${1}"

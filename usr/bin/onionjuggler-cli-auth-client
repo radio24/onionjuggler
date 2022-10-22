@@ -3,9 +3,9 @@
 ## manage client authorization client side (ClientOnionAuthDir)
 
 onionjuggler_defaults="/usr/share/onionjuggler/defaults.sh"
-[ -e "${onionjuggler_defaults}" ] || { printf '%s\n' "${onionjuggler_defaults} does not exist"; exit 1; }
-[ -f "${onionjuggler_defaults}" ] || { printf '%s\n' "${onionjuggler_defaults} is not a regular file"; exit 1; }
-[ -r "${onionjuggler_defaults}" ] || { printf '%s\n' "${onionjuggler_defaults} can not be read"; exit 1; }
+[ -e "${onionjuggler_defaults}" ] || { printf '%s\n' "library ${onionjuggler_defaults} does not exist"; exit 1; }
+[ -f "${onionjuggler_defaults}" ] || { printf '%s\n' "library ${onionjuggler_defaults} is not a regular file"; exit 1; }
+[ -r "${onionjuggler_defaults}" ] || { printf '%s\n' "library ${onionjuggler_defaults} can not be read"; exit 1; }
 . "${onionjuggler_defaults}"
 source_conf
 
@@ -14,11 +14,41 @@ check_plugin_enabled "${me}" || error_msg "Plugin '${me}' is disabled by configu
 
 usage(){
   printf %s"Usage: ${me} [--option <ARGUMENT>]
+Description: client side onion authorization on ClientOnionAuthDir
 Complete options:
-  --on [--onion <ONION>] [--client-priv-key <CLIENT_PRIV_KEY>]
-                            create or add client-side authorization, optionally add client's private key
-  --off [--onion <ONION>]   remove client-side credential
-  --list                    list client-side credentials
+  --on [--client-priv-file=<FILE>] [--replace-file]
+                            import '<FILE>.auth_private' contents
+  --on [--client=<CLIENT>] [--client-priv-config=<CONFIG>] [--replace-file]
+                            import client private configuration
+  --on [--client=<CLIENT>] [--onion <ONION>] [--client-priv-key=<KEY>] [--replace-file]
+                            generate client keys and import priv key, else use existent client's priv key
+  --off [--client=<CLIENT1,CLIENT2,...>]
+                            remove client side credential based on client name
+  --list [--client=<@all|CLIENT1,CLIENT2,...>]
+                            list client side credentials, optionally specify client names
+
+Options:
+  --on                      add client private keys to ClientOninAuthDir
+    --client=<CLIENT>       client name
+    --client-priv-file=<FILE>
+                            client private file
+    --client-priv-config=<CONFIG>
+                            client private configuration
+    --client-priv-key=<KEY>
+                            client private key
+    --onion=<ONION>         onion hostname
+    --replace-file          replace file if it exists under the same name
+  --off                     remove clients in ClientOnionAuthDir
+    --client=<CLIENT1,CLIENT2,...>
+                            client names
+  --list                    list clients in ClientOnionAuthDir
+    --client=<@all|CLIENT1,CLIENT2>
+                            client names
+  --version                 print version
+  --getopt                  print options parsed
+  --getconf                 print configuration values
+  --signal=<SIGNAL>         signal tor reload, restart, none
+  -h, --help                print this help message
 "
   exit 1
 }
@@ -37,9 +67,15 @@ while :; do
   arg_possible="${2}" ## need to pass the second positional parameter because maybe it is an argument
   clean_opt "${1}" || break
   case "${opt}" in
-    on|off|list|n|f|l) status="${opt}";;
-    o|onion|o=*|onion=*) get_arg onion;;
-    client-priv-key|client-priv-key=*) get_arg client_priv_key;;
+    on|off|list|n|f|l) set_arg status "${opt}";;
+    signal) get_arg signal;;
+    client-priv-file) get_arg client_priv_file;;
+    client-priv-config) get_arg client_priv_config;;
+    client-priv-key) get_arg client_priv_key;;
+    o|onion) get_arg onion_hostname;;
+    client) get_arg client;;
+    replace-file) set_arg replace_file "1";;
+    getopt|getconf|V|version) set_arg dev "${opt}";;
     h|help) usage;;
     *) error_msg "Invalid option: '${opt_orig}'";;
   esac
@@ -49,8 +85,16 @@ while :; do
   [ -z "${1}" ] && break
 done
 
-[ "$(id -u)" -ne 0 ] && error_msg "run as root"
+case "${dev}" in
+  getconf) get_conf_values; exit 0;;
+  getopt) printf %s"${arg_saved}\n"; exit 0;;
+  V|version) printf '%s\n' "${me} ${version}"; exit 0;;
+esac
+
+
+pre_run_check
 case "${status}" in
+
 
   ## as the onion service client, add a key given by the onion service operator to authenticate yourself inside ClientOnionAuthDir
   ## The suffix '.auth_private' should not be mentioned, it will be automatically inserted when mentioning the name of the file.
@@ -58,78 +102,172 @@ case "${status}" in
   ## use the onion hostname as the file name, this avoid overriding the file by mistake and it indicates outside of the file for which service it refers to (of course it is written inside also)
   ## adding to Tor Browser automatically not supported yet
   n|on)
-    [ -z "${onion}" ] && usage
-    ## removes protocol such as http(s)://, ssh:// and git:// from the front of the address and trailing / at the end of the onion to clean it and only show the hostname (address.onion)
-    onion="$(printf %s"${onion}\n" | sed "s|.*://||" | sed "s|/$||")"
-    onion_hostname_without_onion="${onion%.onion}"
-    [ "${onion_hostname_without_onion%%*[^a-z2-7]*}" ] || error_msg "Onion domain is invalid, it is not within base32 alphabet lower-case encoding [a-z][2-7]"
-    [ "${#onion_hostname_without_onion}" = "56" ] || error_msg "Onion domain is invalid, LENGTH=${#onion} is different than 56 characters (<56-char-base32>.onion)"
-    safe_edit tmp tor_conf
-    read_tor_files
-    # shellcheck disable=SC2086
-    grep -q "ClientOnionAuthDir" ${tor_config_files} || { printf %s"\nClientOnionAuthDir ${tor_data_dir_auth}\n\n" | tee -a "${tor_conf_tmp}"; }
-    mkdir -p "${tor_data_dir_auth}"
-    if [ -z "${client_priv_key}" ]; then
-      ## Generate pem and derive pub and priv keys
-      "${openssl_cmd}" genpkey -algorithm x25519 -out /tmp/k1.prv.pem
-      grep -v "PRIVATE KEY" /tmp/k1.prv.pem | base64pem -d | tail -c 32 | base32 | sed 's/=//g' > /tmp/k1.prv.key
-      "${openssl_cmd}" pkey -in /tmp/k1.prv.pem -pubout | grep -v "PUBLIC KEY" | base64pem -d | tail -c 32 | base32 | sed 's/=//g' > /tmp/k1.pub.key
-      ## save variables
-      client_pub_key=$(cat /tmp/k1.pub.key)
-      client_priv_key=$(cat /tmp/k1.prv.key)
+
+    auth_client_check_file(){
+      test -f "${client_priv_file}" || error_msg "file ${client_priv_file} does not exist or is not a regular file"
+      test -r "${client_priv_file}" || error_msg "file ${client_priv_file} cannot be read"
+      client_priv_file_name="${client_priv_file##*/}"
+      [ "${client_priv_file_name%%*[^a-zA-Z0-9_.-]*}" ] || error_msg "file name can only contain letters, numbers, hifen, underscore and dot"
+      echo "${client_priv_file_name}" | cut -c 1 | grep -qF "." && error_msg "file name can not start with dot"
+      ## avoid copying wrong file to the auth dir
+      echo "${client_priv_file_name}" | grep -q ".auth_private$" || error_msg "file name does not end with '.auth_private'"
+    }
+
+    auth_client_check_replace(){
+      client_priv_file="${1}"
+      client_priv_file_name="${client_priv_file##*/}"
+      if test -f "${tor_data_dir_auth}/${client_priv_file_name}"; then
+        test -n "${replace_file}" || error_msg "file named ${client_priv_file_name} already exist on ${tor_data_dir_auth}, to replace it, use the option '--replace-file'"
+      fi
+      ## multiple files with the same onion address leads to a tor error
+      for auth in "${tor_data_dir_auth}"/*; do
+        [ "${auth##*/}" = "*" ] && break
+        if [ "${auth##*/}" != "${client_priv_file_name}" ]; then
+          ## compare onion address, the first field
+          [ "${client_priv_key_config%%:*}" = "$(cut -d ":" -f1 "${auth}")" ] && error_msg "file with the same onion address already present on ${auth}"
+        fi
+      done
+    }
+
+    auth_client_check_content(){
+      client_priv_file_content="${1}"
+      echo "${client_priv_file_content}" | grep -q ":descriptor:x25519:" || error_msg "configuraiton does not contain pattern ':descriptor:x25519:"
+      [ "${client_priv_file_content%%*[^a-zA-Z0-9:]*}" ] || error_msg "configuration has special characters, perhaps extra spaces?"
+      client_priv_file_onion_found="$(echo "${client_priv_file_content}" | cut -d ":" -f1)"
+      [ "${client_priv_file_onion_found%%*[^a-z2-7]*}" ] || error_msg "onion '${client_priv_file_onion_found}' is not within base32 alphabet lower-case encoding [a-z][2-7]"
+      [ "${#client_priv_file_onion_found}" = "56" ] || error_msg "onion '${client_priv_file_onion_found}' has size '${#client_priv_file_onion_found}', but expected 56 chars"
+      echo "${client_priv_file_content}" | cut -d ":" -f2 | grep -q "descriptor" || error_msg "descriptor reference not found in the 2nd field"
+      echo "${client_priv_file_content}" | cut -d ":" -f3 | grep -q "x25519" || error_msg "descriptor type not found in the 3rd field"
+      client_priv_file_priv_found="$(echo "${client_priv_file_content}" | cut -d ":" -f4)"
+      [ "${client_priv_file_priv_found%%*[^A-Z2-7]*}" ] || error_msg "client private key '${client_priv_file_priv_found}' is not within base32 alphabet upper-case encoding [A-Z][2-7]"
+      [ "${#client_priv_file_priv_found}" = "52" ] || error_msg "client private key '${client_priv_file_priv_found}' has size of '${#client_priv_file_priv_found}', but expected 52 chars"
+      ## this check is last in the list because it doesn't indicate where the problem is, just that the size doesn't match
+      [ "${#client_priv_file_content}" = "127" ] || error_msg "config '${client_priv_file_content}' has size '${#client_priv_file_content}', but expected 127 chars"
+    }
+
+    create_clientonionauthdir(){
+      # shellcheck disable=SC2086
+      if grep -q "ClientOnionAuthDir"  ${tor_dump_config_file}; then
+        if ! grep -q "ClientOnionAuthDir ${tor_data_dir_auth}" ${tor_dump_config_file}; then
+          client_onion_auth_dir_found="$(grep "ClientOnionAuthDir"  ${tor_dump_config_file} | cut -d " " -f2)"
+          error_msg "ClientOnionAuthDir found is ${client_onion_auth_dir_found}, not ${tor_data_dir_auth} as specifed on onionjuggler configuration"
+        fi
+      else
+        safe_edit tmp tor_conf
+        printf %s"\nClientOnionAuthDir ${tor_data_dir_auth}\n\n" | tee -a "${tor_conf_tmp}"
+      fi
+
+      test -d "${tor_data_dir_auth}" || mkdir -p "${tor_data_dir_auth}"
+    }
+
+    clean_onion(){
+      check_opt_filled onion_hostname
+      ## clean URL of protocol (http(s)://) and page (/index.html), tail 63 bytes to clean subdomain
+      ## example of URL it is able to clean:
+      ##  http://www.dds6qkxpwdeubwucdiaord2xgbbeyds25rbsgr73tbfpqpt4a6vjwsyd.onion/wiki/Remote_Administration
+      onion_hostname="$(printf %s"${onion_hostname}\n" | sed "s|.*://||;s|/.*||" | tail -c 63)"
+      onion_hostname_without_onion="${onion_hostname%.onion}"
+    }
+
+    auth_client_finish(){
+      # shellcheck disable=SC2034
+      auth_client_conf="${tor_data_dir_auth}/${client}.auth_private"
+      safe_edit tmp auth_client_conf
+      printf %s"${client_priv_key_config}\n" | tee "${auth_client_conf_tmp}" >/dev/null
+      notice "Client side authorization configured"
+      notice "\nClient private key config saved to ${tor_data_dir_auth}/${client}.auth_private"
+      notice "${bold}- Client priv conf:${nocolor} ${client_priv_key_config}"
+      notice "\nNow it depends on the service operator to authorize your client public key"
+    }
+
+
+    ## main
+    create_clientonionauthdir
+    if test -n "${client_priv_file}"; then
+      client="${client_priv_file##*/}"
+      client="${client%.auth_private}"
+      auth_client_check_file
+      client_priv_key_config="$(cat "${client_priv_file}")"
+      auth_client_check_content "${client_priv_key_config}"
+      auth_client_check_replace "${client_priv_file}"
+      auth_client_finish
+
+    elif test -n "${client_priv_config}"; then
+      check_opt_filled client
+      client="${client##*/}"
+      check_name client
+      client_priv_key_config="${client_priv_config}"
+      auth_client_check_content "${client_priv_key_config}"
+      auth_client_check_replace "${client}.auth_private"
+      auth_client_finish
+
+    elif test -n "${client_priv_key}"; then
+      check_opt_filled client
+      client="${client##*/}"
+      check_name client
+      clean_onion
       client_priv_key_config="${onion_hostname_without_onion}:descriptor:x25519:${client_priv_key}"
-      client_pub_key_config="descriptor:x25519:${client_pub_key}"
-      ## Delete pem and keys
-      rm -f /tmp/k1.pub.key /tmp/k1.prv.key /tmp/k1.prv.pem
-      # Client side configuration
-      printf %s"${client_priv_key_config}\n" | tee "${tor_data_dir_auth}"/"${onion_hostname_without_onion}".auth_private >/dev/null
-      notice "${bold}Client side authorization configured${nocolor}"
-      notice "This is your private key, keep it safe, keep it hidden:"
-      notice "client_priv_key=${client_priv_key}"
-      notice "client_priv_key_config=${client_priv_key_config}"
-      notice "\n${bold}Now it depends on the service operator to authorize your client public key${nocolor}"
-      ## Server side configuration
-      notice "Send the public key and instructions to the onion service operator of ${onion}"
-      notice "client_pub_key=${client_pub_key}"
-      notice "client_pub_key_config=${client_pub_key_config}"
+      auth_client_check_content "${client_priv_key_config}"
+      auth_client_check_replace "${client}.auth_private"
+      auth_client_finish
+
     else
-      client_priv_key_config="${onion_hostname_without_onion}:descriptor:x25519:${client_priv_key}"
-      printf %s"${client_priv_key_config}\n" | tee "${tor_data_dir_auth}"/"${onion_hostname_without_onion}".auth_private >/dev/null
-      notice "\n${bold}Client side authorization configured${nocolor}"
-      notice "As you inserted the private key manually, it ise expected that you have already sent/received the public key to/from the onion service operator"
-      notice "client_priv_key_config=${client_priv_key_config}"
+      check_opt_filled client
+      client="${client##*/}"
+      check_name client
+      clean_onion
+      gen_auth_key_pair
+      auth_client_check_replace "${client}.auth_private"
+      auth_client_finish
+      notice "Send the public key config to the onion service operator of ${onion_hostname}.onion"
+      notice "${bold}- Client pub conf:${nocolor} ${client_pub_key_config}"
     fi
+
+    printf '\n'
+    signal_tor
   ;;
+
 
   ## as the onion service client, delete '.auth_private' files from ClientOnionAuthDir that are not valid or has no use anymore
   f|off)
-    [ -z "${onion}" ] && usage
-    onion="$(printf %s"${onion}\n" | sed "s|.*://||" | sed "s|/.*$||")"
+    is_dir_empty "${tor_data_dir_auth}" && error_msg "ClientOnionAuthDir ${tor_data_dir_auth} is empty"
+    check_opt_filled client
+
     auth_client_remove(){
-      onion="${1}"
-      notice "\n${red}Removing ${tor_data_dir_auth}/${onion}.auth_private${nocolor}"
-      rm -fv "${tor_data_dir_auth}"/"${onion}".auth_private
+      client="${1}"
+      client="${client##*/}"
+      client_clean="${client%.auth_private}"
+      if test -f "${tor_data_dir_auth}/${client_clean}".auth_private; then
+        notice "${red}Removing ${tor_data_dir_auth}/${client_clean}.auth_private${nocolor}"
+        rm -fv "${tor_data_dir_auth}/${client_clean}".auth_private
+      else
+        error_msg "File ${tor_data_dir_auth}/${client_clean}.auth_private does not exist"
+      fi
     }
-    if ! check_folder_is_not_empty "${tor_data_dir_auth}"; then
-      loop_list auth_client_remove "${onion}"
-    else
-      error_msg "ClientOnionAuthDir is empty"
-    fi
+
+    loop_list auth_client_remove "${client}"
+    printf '\n'
+    signal_tor
   ;;
+
 
   l|list)
-    if ! check_folder_is_not_empty "${tor_data_dir_auth}"; then
-      notice "ClientOnionAuthDir ${tor_data_dir_auth}"
-      for auth in "${tor_data_dir_auth}"/*; do
-        auth="${auth##*/}"
-        notice "\nFile name: ${bold}${auth}${nocolor}"
-        notice "Content:   ${bold}$(grep "descriptor:x25519:" "${tor_data_dir_auth}"/"${auth}")${nocolor}"
-      done
-      printf "\n"
-    else
-      error_msg "ClientOnionAuthDir is empty"
+    auth_client_list(){
+      auth="${1}"
+      auth="${auth##*/}"
+      notice "\n${bold}File name:${nocolor} ${auth}.auth_private"
+      notice "${bold}Content:${nocolor} $(grep "descriptor:x25519:" "${tor_data_dir_auth}/${auth}.auth_private")"
+    }
+
+    is_dir_empty "${tor_data_dir_auth}" && error_msg "ClientOnionAuthDir ${tor_data_dir_auth} is empty"
+    notice "${bold}ClientOnionAuthDir ${tor_data_dir_auth}${nocolor}"
+    if [ -z "${client}" ] || [ "${client}" = "@all" ]; then
+      create_client_priv_list; client="${client_name_priv_list}"
     fi
+    loop_list auth_client_list "${client}"
   ;;
 
+
   *) usage;;
+
 esac
